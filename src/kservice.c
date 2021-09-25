@@ -1109,6 +1109,12 @@ rt_device_t rt_console_get_device(void)
 }
 RTM_EXPORT(rt_console_get_device);
 
+void rt_set_console_device(rt_device_t new_dev)
+{
+	_console_device = new_dev;
+}
+RTM_EXPORT(rt_set_console_device);
+
 /**
  * This function will set a device as console device.
  * After set a device to console, all output of rt_kprintf will be

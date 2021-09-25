@@ -540,7 +540,7 @@ void ls(const char *pathname)
     /* list directory */
     if (dfs_file_open(&fd, path, O_DIRECTORY) == 0)
     {
-        rt_kprintf("Directory %s:\n", path);
+        // rt_kprintf("Directory %s:\n", path);
         do
         {
             memset(&dirent, 0, sizeof(struct dirent));
@@ -556,14 +556,16 @@ void ls(const char *pathname)
 
                 if (dfs_file_stat(fullpath, &stat) == 0)
                 {
-                    rt_kprintf("%-20s", dirent.d_name);
+                    // rt_kprintf("%-20s", dirent.d_name);
                     if (S_ISDIR(stat.st_mode))
                     {
-                        rt_kprintf("%-25s\n", "<DIR>");
+                        // rt_kprintf("%-25s\n", "<DIR>");
+                        rt_kprintf("%s/  ", dirent.d_name);
                     }
                     else
                     {
-                        rt_kprintf("%-25lu\n", (unsigned long)stat.st_size);
+                        // rt_kprintf("%-25lu\n", (unsigned long)stat.st_size);
+                        rt_kprintf("%s  ", dirent.d_name);
                     }
                 }
                 else
@@ -572,6 +574,7 @@ void ls(const char *pathname)
             }
         }
         while (length > 0);
+        rt_kprintf("\n");
 
         dfs_file_close(&fd);
     }

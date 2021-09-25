@@ -809,6 +809,7 @@ static char *const device_type_str[] =
     "Sound Device",
     "Graphic Device",
     "I2C Bus",
+    "I2C Device",
     "USB Slave Device",
     "USB Host Bus",
     "SPI Bus",
@@ -1149,4 +1150,3 @@ FINSH_VAR_EXPORT(dummy, finsh_type_int, dummy variable for finsh)
 #endif
 
 #endif /* RT_USING_FINSH */
-

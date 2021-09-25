@@ -207,6 +207,7 @@ int finsh_flush(struct finsh_parser* parser);
 int finsh_reset(struct finsh_parser* parser);
 #ifdef RT_USING_DEVICE
 void finsh_set_device(const char* device_name);
+void finsh_set_device_without_open(const char* device_name);
 #endif
 
 /* run finsh parser to generate abstract synatx tree */

@@ -239,6 +239,45 @@ void finsh_set_device(const char *device_name)
 /**
  * @ingroup finsh
  *
+ * This function sets the input device of finsh shell but won't open it.
+ *
+ * @param device_name the name of new input device.
+ */
+void finsh_set_device_without_open(const char *device_name)
+{
+	rt_device_t dev = RT_NULL;
+
+	if(shell == RT_NULL) {
+		/* finsh system is not initialized yet */
+		return ;
+	}
+
+	dev = rt_device_find(device_name);
+
+	if(dev == RT_NULL) {
+		rt_kprintf("finsh: can not find device: %s\n", device_name);
+		return;
+	}
+
+	/* device should be opened by upper layer console */
+	if(shell->device != RT_NULL) {
+		/* clear the rx indicate of old device */
+		rt_device_set_rx_indicate(shell->device, RT_NULL);
+	}
+
+	/* clear line buffer before switch to new device */
+	memset(shell->line, 0, sizeof(shell->line));
+	shell->line_curpos = shell->line_position = 0;
+
+	/* set new shell device */
+	shell->device = dev;
+	/* set rx indicate for new deivce */
+	rt_device_set_rx_indicate(dev, finsh_rx_ind);
+}
+
+/**
+ * @ingroup finsh
+ *
  * This function returns current finsh shell input device.
  *
  * @return the finsh shell input device name is returned.
@@ -537,7 +576,7 @@ void finsh_thread_entry(void *parameter)
     finsh_wait_auth();
 #endif
 
-    rt_kprintf(FINSH_PROMPT);
+    // rt_kprintf(FINSH_PROMPT);    /* do not print pompt in the beginning */
 
     while (1)
     {

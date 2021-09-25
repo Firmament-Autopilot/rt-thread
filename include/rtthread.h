@@ -157,6 +157,7 @@ int  rt_thread_kill(rt_thread_t tid, int sig);
 void rt_thread_suspend_sethook(void (*hook)(rt_thread_t thread));
 void rt_thread_resume_sethook (void (*hook)(rt_thread_t thread));
 void rt_thread_inited_sethook (void (*hook)(rt_thread_t thread));
+void rt_thread_deleted_sethook(void (*hook)(rt_thread_t thread));
 #endif
 
 /*
@@ -525,6 +526,7 @@ rt_int32_t rt_snprintf(char *buf, rt_size_t size, const char *format, ...);
 #if defined(RT_USING_DEVICE) && defined(RT_USING_CONSOLE)
 rt_device_t rt_console_set_device(const char *name);
 rt_device_t rt_console_get_device(void);
+void rt_set_console_device(rt_device_t new_dev);
 #endif
 
 rt_err_t rt_get_errno(void);
