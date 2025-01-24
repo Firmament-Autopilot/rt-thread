@@ -173,7 +173,7 @@ static int finsh_getchar(void)
     char ch = 0;
 
     RT_ASSERT(shell != RT_NULL);
-    while (rt_device_read(shell->device, -1, &ch, 1) != 1)
+    while (rt_device_read(shell->device, 0, &ch, 1) != 1)
         rt_sem_take(&shell->rx_sem, RT_WAITING_FOREVER);
 
     return (int)ch;
