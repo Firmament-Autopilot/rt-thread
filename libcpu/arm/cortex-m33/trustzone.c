@@ -11,10 +11,15 @@
 #include <rtthread.h>
 
 extern void TZ_InitContextSystem_S(void);
-extern rt_uint32_t TZ_AllocModuleContext_S (rt_uint32_t module);
+extern rt_uint32_t TZ_AllocModuleContext_S(rt_uint32_t module);
 extern rt_uint32_t TZ_FreeModuleContext_S(rt_uint32_t id);
 extern rt_uint32_t TZ_LoadContext_S(rt_uint32_t id);
 extern rt_uint32_t TZ_StoreContext_S(rt_uint32_t id);
+void TZ_InitContextSystem_S(void) {}
+rt_uint32_t TZ_AllocModuleContext_S (rt_uint32_t module){return 0;}
+rt_uint32_t TZ_FreeModuleContext_S(rt_uint32_t id) {return 0;}
+rt_uint32_t TZ_LoadContext_S(rt_uint32_t id){return 0;};
+rt_uint32_t TZ_StoreContext_S(rt_uint32_t id){return 0;};
 extern int tzcall(int id, rt_ubase_t arg0, rt_ubase_t arg1, rt_ubase_t arg2);
 
 #define TZ_INIT_CONTEXT_ID     (0x1001)
@@ -93,7 +98,6 @@ void rt_trustzone_context_load(rt_ubase_t context)
 
 int rt_secure_svc_handle(int svc_id, rt_ubase_t arg0, rt_ubase_t arg1, rt_ubase_t arg2)
 {
-    rt_ubase_t tmp;
     int res = 0;
 
     switch (svc_id)
