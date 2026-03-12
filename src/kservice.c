@@ -777,7 +777,7 @@ static char *print_number(char *buf,
     return buf;
 }
 
-rt_int32_t rt_vsnprintf(char       *buf,
+RT_WEAK rt_int32_t rt_vsnprintf(char       *buf,
                         rt_size_t   size,
                         const char *fmt,
                         va_list     args)
