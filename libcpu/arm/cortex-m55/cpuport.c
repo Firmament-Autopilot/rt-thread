@@ -50,10 +50,9 @@ struct exception_stack_frame
 
 struct stack_frame
 {
-    rt_uint32_t tz;
-    rt_uint32_t lr;
-    rt_uint32_t psplim;
-    rt_uint32_t control;
+#if USE_FPU
+    rt_uint32_t flag;
+#endif /* USE_FPU */
 
     /* r4 ~ r11 register */
     rt_uint32_t r4;
@@ -169,10 +168,9 @@ rt_uint8_t *rt_hw_stack_init(void       *tentry,
     stack_frame->exception_stack_frame.pc  = (unsigned long)tentry;    /* entry point, pc */
     stack_frame->exception_stack_frame.psr = 0x01000000L;              /* PSR */
 
-    stack_frame->tz = 0x00;
-    stack_frame->lr = 0xFFFFFFBC;
-    stack_frame->psplim = 0x00;
-    stack_frame->control = 0x00;
+#if USE_FPU
+    stack_frame->flag = 0;
+#endif /* USE_FPU */
 
     /* return task's current stack address */
     return stk;
@@ -431,7 +429,7 @@ void rt_hw_hard_fault_exception(struct exception_info *exception_info)
 /**
  * shutdown CPU
  */
-RT_WEAK void rt_hw_cpu_shutdown(void)
+void rt_hw_cpu_shutdown(void)
 {
     rt_kprintf("shutdown...\n");
 
@@ -445,6 +443,13 @@ RT_WEAK void rt_hw_cpu_reset(void)
 {
     SCB_AIRCR = SCB_RESET_VALUE;
 }
+
+void TaskSwitch_StackCheck(void)
+{
+    volatile rt_uint32_t end_of_stack_val = (rt_uint32_t) rt_thread_self()->stack_addr;
+    __asm volatile ("MSR psplim, %0" : : "r" (end_of_stack_val));
+}
+
 
 #ifdef RT_USING_CPU_FFS
 /**
@@ -475,14 +480,13 @@ int __rt_ffs(int value)
 {
     __asm volatile(
         "CMP     r0, #0x00            \n"
-        "BEQ     1f                   \n"
+        "BEQ     exit                 \n"
 
         "RBIT    r0, r0               \n"
         "CLZ     r0, r0               \n"
         "ADDS    r0, r0, #0x01        \n"
 
-        "1:                           \n"
-        "BX      lr                   \n"
+        "exit:                        \n"
 
         : "=r"(value)
         : "r"(value)

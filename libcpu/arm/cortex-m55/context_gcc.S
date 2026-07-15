@@ -13,10 +13,11 @@
  */
 
 /**
- * @addtogroup cortex-m4
+ * @addtogroup cortex-m55
  */
 /*@{*/
 
+.cpu cortex-m7
 .syntax unified
 .thumb
 .text
@@ -90,112 +91,78 @@ PendSV_Handler:
     CPSID   I
 
     /* get rt_thread_switch_interrupt_flag */
-    LDR     r0, =rt_thread_switch_interrupt_flag    /* r0 = &rt_thread_switch_interrupt_flag */
-    LDR     r1, [r0]                                /* r1 = *r1 */
-    CMP     r1, #0x00                               /* compare r1 == 0x00 */
-    BNE     schedule
-    MSR     PRIMASK, r2                             /* if r1 == 0x00, do msr PRIMASK, r2 */
-    BX      lr                                      /* if r1 == 0x00, do bx lr */
-
-schedule:
-    PUSH    {r2}                                    /* store interrupt state */
+    LDR r0, =rt_thread_switch_interrupt_flag
+    LDR r1, [r0]
+    CBZ r1, pendsv_exit         /* pendsv already handled */
 
     /* clear rt_thread_switch_interrupt_flag to 0 */
-    MOV     r1, #0x00                               /* r1 = 0x00 */
-    STR     r1, [r0]                                /* *r0 = r1 */
+    MOV r1, #0x00
+    STR r1, [r0]
 
-    /* skip register save at the first time */
-    LDR     r0, =rt_interrupt_from_thread           /* r0 = &rt_interrupt_from_thread */
-    LDR     r1, [r0]                                /* r1 = *r0 */
-    CBZ     r1, switch_to_thread                    /* if r1 == 0, goto switch_to_thread */
+    LDR r0, =rt_interrupt_from_thread
+    LDR r1, [r0]
+    CBZ r1, switch_to_thread    /* skip register save at the first time */
 
-    /* Whether TrustZone thread stack exists */
-    LDR     r1,  =rt_trustzone_current_context      /* r1 = &rt_secure_current_context */
-    LDR     r1, [r1]                                /* r1 = *r1 */
-    CBZ     r1, contex_ns_store                     /* if r1 == 0, goto contex_ns_store */
-
-    /*call TrustZone fun, Save TrustZone stack */
-    STMFD   sp!, {r0-r1, lr}                        /* push register */
-    MOV     r0, r1                                  /* r0 = rt_secure_current_context */
-    BL rt_trustzone_context_store                   /* call TrustZone store fun */
-    LDMFD   sp!, {r0-r1, lr}                        /* pop register */
-
-    /* check break from TrustZone */
-    MOV     r2, lr                                  /* r2 = lr */
-    TST     r2, #0x40                               /* if EXC_RETURN[6] is 1, TrustZone stack was used */
-    BEQ     contex_ns_store                         /* if r2 & 0x40 == 0, goto contex_ns_store */
-
-    /* push PSPLIM CONTROL PSP LR current_context to stack */
-    MRS     r3, psplim                              /* r3 = psplim */
-    MRS     r4, control                             /* r4 = control */
-    MRS     r5, psp                                 /* r5 = psp */
-    STMFD   r5!, {r1-r4}                            /* push to thread stack */
-
-    /* update from thread stack pointer */
-    LDR     r0, [r0]                                /* r0 = rt_thread_switch_interrupt_flag */
-    STR     r5, [r0]                                /* *r0 = r5 */
-    b switch_to_thread                              /* goto switch_to_thread */
-
-contex_ns_store:
-
-    MRS     r1, psp                                 /* get from thread stack pointer */
+    MRS r1, psp                 /* get from thread stack pointer */
 
 #if defined (__VFP_FP__) && !defined(__SOFTFP__)
-    TST     lr, #0x10                               /* if(!EXC_RETURN[4]) */
-    VSTMDBEQ  r1!, {d8 - d15}                       /* push FPU register s16~s31 */
+    TST     lr, #0x10           /* if(!EXC_RETURN[4]) */
+    IT      EQ
+    VSTMDBEQ r1!, {s16 - s31}   /* push FPU register s16~s31 */
 #endif
 
-    STMFD   r1!, {r4 - r11}                         /* push r4 - r11 register */
+    STMFD   r1!, {r4 - r11}     /* push r4 - r11 register */
+	
+#if defined (__VFP_FP__) && !defined(__SOFTFP__)
+    MOV     r4, #0x00           /* flag = 0 */
 
-    LDR     r2,  =rt_trustzone_current_context      /* r2 = &rt_secure_current_context */
-    LDR     r2, [r2]                                /* r2 = *r2 */
-    MOV     r3, lr                                  /* r3 = lr */
-    MRS     r4, psplim                              /* r4 = psplim */
-    MRS     r5, control                             /* r5 = control */
-    STMFD   r1!, {r2-r5}                            /* push to thread stack */
+    TST     lr, #0x10           /* if(!EXC_RETURN[4]) */
+    IT      EQ
+    MOVEQ   r4, #0x01           /* flag = 1 */
 
-    LDR     r0, [r0]
-    STR     r1, [r0]                                /* update from thread stack pointer */
+    STMFD   r1!, {r4}           /* push flag */
+#endif
+
+    LDR r0, [r0]
+    STR r1, [r0]                /* update from thread stack pointer */
 
 switch_to_thread:
-    LDR     r1, =rt_interrupt_to_thread
-    LDR     r1, [r1]
-    LDR     r1, [r1]                                /* load thread stack pointer */
+	/* set PSPLIM register */
+	PUSH    {LR}
+	bl		TaskSwitch_StackCheck
+	POP		{LR}
 
-    /* update current TrustZone context */
-    LDMFD   r1!, {r2-r5}                            /* pop thread stack */
-    MSR     psplim, r4                              /* psplim = r4 */
-    MSR     control, r5                             /* control = r5 */
-    MOV     lr, r3                                  /* lr = r3 */
-    LDR     r6,  =rt_trustzone_current_context      /* r6 = &rt_secure_current_context */
-    STR     r2, [r6]                                /* *r6 = r2 */
-    MOV     r0, r2                                  /* r0 = r2 */
-
-    /* Whether TrustZone thread stack exists */
-    CBZ     r0, contex_ns_load                      /* if r0 == 0, goto contex_ns_load */
-    PUSH    {r1, r3}                                /* push lr, thread_stack */
-    BL rt_trustzone_context_load                    /* call TrustZone load fun */
-    POP     {r1, r3}                                /* pop lr, thread_stack */
-    MOV     lr, r3                                  /* lr = r1 */
-    TST     r3, #0x40                               /* if EXC_RETURN[6] is 1, TrustZone stack was used */
-    BEQ     contex_ns_load                          /* if r1 & 0x40 == 0, goto contex_ns_load */
-    B pendsv_exit
-
-contex_ns_load:
-    LDMFD   r1!, {r4 - r11}                         /* pop r4 - r11 register */
+    LDR r1, =rt_interrupt_to_thread
+    LDR r1, [r1]
+    LDR r1, [r1]                /* load thread stack pointer */
 
 #if defined (__VFP_FP__) && !defined(__SOFTFP__)
-    TST     lr, #0x10                               /* if(!EXC_RETURN[4]) */
-    VLDMIAEQ  r1!, {d8 - d15}                       /* pop FPU register s16~s31 */
+    LDMFD   r1!, {r3}           /* pop flag */
+#endif
+
+    LDMFD   r1!, {r4 - r11}     /* pop r4 - r11 register */
+	
+#if defined (__VFP_FP__) && !defined(__SOFTFP__)
+    CMP     r3,  #0             /* if(flag_r3 != 0) */
+    IT      NE
+    VLDMIANE  r1!, {s16 - s31}  /* pop FPU register s16~s31 */
+#endif
+
+    MSR psp, r1                 /* update stack pointer */
+
+#if defined (__VFP_FP__) && !defined(__SOFTFP__)
+    ORR     lr, lr, #0x10       /* lr |=  (1 << 4), clean FPCA. */
+    CMP     r3,  #0             /* if(flag_r3 != 0) */
+    IT      NE
+    BICNE   lr, lr, #0x10       /* lr &= ~(1 << 4), set FPCA. */
 #endif
 
 pendsv_exit:
-    MSR     psp, r1                                 /* update stack pointer */
     /* restore interrupt */
-    POP    {r2}
-    MSR     PRIMASK, r2
+    MSR PRIMASK, r2
 
-    BX      lr
+    ORR lr, lr, #0x04
+    BX  lr
 
 /*
  * void rt_hw_context_switch_to(rt_uint32 to);
@@ -246,6 +213,10 @@ rt_hw_context_switch_to:
     CPSIE   F
     CPSIE   I
 
+    /* ensure PendSV exception taken place before subsequent operation */
+    DSB
+    ISB
+
     /* never reach here! */
 
 /* compatible with old version */
@@ -259,30 +230,25 @@ rt_hw_interrupt_thread_switch:
 .type HardFault_Handler, %function
 HardFault_Handler:
     /* get current context */
-    MRS     r0, msp                                 /* get fault context from handler. */
-    TST     lr, #0x04                               /* if(!EXC_RETURN[2]) */
-    BEQ     get_sp_done
-    MRS     r0, psp                                 /* get fault context from thread. */
-get_sp_done:
+    MRS     r0, msp                 /* get fault context from handler. */
+    TST     lr, #0x04               /* if(!EXC_RETURN[2]) */
+    BEQ     _get_sp_done
+    MRS     r0, psp                 /* get fault context from thread. */
+_get_sp_done:
 
-    STMFD   r0!, {r4 - r11}                         /* push r4 - r11 register */
+    STMFD   r0!, {r4 - r11}         /* push r4 - r11 register */
+#if defined (__VFP_FP__) && !defined(__SOFTFP__)
+    STMFD   r0!, {lr}               /* push dummy for flag */
+#endif
+    STMFD   r0!, {lr}               /* push exec_return register */
 
-    LDR     r2,  =rt_trustzone_current_context      /* r2 = &rt_secure_current_context */
-    LDR     r2, [r2]                                /* r2 = *r2 */
-    MOV     r3, lr                                  /* r3 = lr */
-    MRS     r4, psplim                              /* r4 = psplim */
-    MRS     r5, control                             /* r5 = control */
-    STMFD   r0!, {r2-r5}                            /* push to thread stack */
-
-    STMFD   r0!, {lr}                               /* push exec_return register */
-
-    TST     lr, #0x04                               /* if(!EXC_RETURN[2]) */
-    BEQ     update_msp
-    MSR     psp, r0                                 /* update stack pointer to PSP. */
-    B       update_done
-update_msp:
-    MSR     msp, r0                                 /* update stack pointer to MSP. */
-update_done:
+    TST     lr, #0x04               /* if(!EXC_RETURN[2]) */
+    BEQ     _update_msp
+    MSR     psp, r0                 /* update stack pointer to PSP. */
+    B       _update_done
+_update_msp:
+    MSR     msp, r0                 /* update stack pointer to MSP. */
+_update_done:
 
     PUSH    {LR}
     BL      rt_hw_hard_fault_exception
